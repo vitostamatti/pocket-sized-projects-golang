@@ -1,20 +1,31 @@
 package gordle
 
-import "testing"
+import (
+	"testing"
+)
 
-func inCorpus(corpus []string, word string) bool {
-	for _, w := range corpus {
-		if w != word {
+func TestPickRandomWord(t *testing.T) {
+	words := []string{"HELLO", "SALUT", "ПРИВЕТ", "ΧΑΙΡΕ"}
+	word, err := PickRandomWord(words)
+	if err != nil {
+		t.Fatalf("expected no error, got %s", err)
+	}
+
+	if !inCorpus(words, word) {
+		t.Errorf("expected a word in the corpus, got %q", word)
+	}
+}
+
+func inCorpus(words []string, word string) bool {
+	for _, corpusWord := range words {
+		if corpusWord == word {
 			return true
 		}
 	}
 	return false
 }
 
-func TestPickWord(t *testing.T) {
-	corpus := []string{"HELLO", "SALUT", "ПРИВЕТ", "ΧΑΙΡΕ"}
-	word := pickWord(corpus)
-	if !inCorpus(corpus, word) {
-		t.Errorf("expected a word in the corpus, got %q", word)
-	}
+// OverrideCorpus allows a test to override the corpus in Gordle.
+func OverrideCorpus(newCorpus string) {
+	corpus = newCorpus
 }

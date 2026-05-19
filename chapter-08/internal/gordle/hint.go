@@ -2,7 +2,8 @@ package gordle
 
 import "strings"
 
-type hint byte
+// hint describes the validity of a character in a word.
+type hint int
 
 const (
 	absentCharacter hint = iota
@@ -10,46 +11,53 @@ const (
 	correctPosition
 )
 
-// String implements the Stringer ingerfafe
+// String implements the Stringer interface.
 func (h hint) String() string {
 	switch h {
 	case absentCharacter:
-		return "⬜️"
+		return "-"
 	case wrongPosition:
-		return "🟨"
+		return "?"
 	case correctPosition:
-		return "🟩"
+		return "+"
 	default:
-		return "🟥"
+		// This should never happen.
+		return "💔"
 	}
 }
 
-type feedback []hint
+// Feedback is a list of hints, one per character of the word.
+type Feedback []hint
 
-func (fb feedback) StringConcat() string {
-	var output string
-	for _, h := range fb {
-		output += h.String()
-	}
-	return output
-}
-
-func (fb feedback) String() string {
+// String implements the Stringer interface for a slice of hints.
+func (fb Feedback) String() string {
 	sb := strings.Builder{}
-	for _, h := range fb {
-		sb.WriteString(h.String())
+	for _, s := range fb {
+		sb.WriteString(s.String())
 	}
 	return sb.String()
 }
 
-func (fb feedback) Equal(other feedback) bool {
+// Equal determines equality of two feedbacks.
+func (fb Feedback) Equal(other Feedback) bool {
 	if len(fb) != len(other) {
 		return false
 	}
-	for i := range fb {
-		if fb[i] != other[i] {
+	for index, value := range fb {
+		if value != other[index] {
 			return false
 		}
 	}
+	return true
+}
+
+// GameWon returns whether a feedback indicates a player has found all characters.
+func (fb Feedback) GameWon() bool {
+	for _, c := range fb {
+		if c != correctPosition {
+			return false
+		}
+	}
+
 	return true
 }

@@ -1,37 +1,61 @@
 package gordle
 
-import "testing"
+import (
+	"testing"
 
-func TestFeedbackString(t *testing.T) {
+	"github.com/stretchr/testify/assert"
+)
 
+func Test_feedback_String(t *testing.T) {
 	testCases := map[string]struct {
-		fb   feedback
+		fb   Feedback
 		want string
 	}{
 		"three correct": {
-			fb:   feedback{correctPosition, correctPosition, correctPosition},
-			want: "🟩🟩🟩",
+			fb:   Feedback{correctPosition, correctPosition, correctPosition},
+			want: "+++",
 		},
 		"one of each": {
-			fb:   feedback{correctPosition, wrongPosition, absentCharacter},
-			want: "🟩🟨⬜️",
+			fb:   Feedback{correctPosition, wrongPosition, absentCharacter},
+			want: "+?-",
 		},
-		"one for each (different order)": {
-			fb:   feedback{wrongPosition, absentCharacter, correctPosition},
-			want: "🟨⬜️🟩",
+		"different order for one of each": {
+			fb:   Feedback{wrongPosition, absentCharacter, correctPosition},
+			want: "?-+",
 		},
-		"unknown": {
-			fb:   feedback{4},
-			want: "🟥",
+		"unknown position": {
+			fb:   Feedback{404},
+			want: "💔",
+		},
+	}
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if got := testCase.fb.String(); got != testCase.want {
+				t.Errorf("String() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFeedbackGameWon(t *testing.T) {
+	tt := map[string]struct {
+		fb   Feedback
+		want bool
+	}{
+		"game not won": {
+			fb:   Feedback{0, 1, 0, 0, 0},
+			want: false,
+		},
+		"game won": {
+			fb:   Feedback{2, 2, 2, 2, 2},
+			want: true,
 		},
 	}
 
-	for name, tc := range testCases {
+	for name, tc := range tt {
 		t.Run(name, func(t *testing.T) {
-			got := tc.fb.String()
-			if got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
+			got := tc.fb.GameWon()
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

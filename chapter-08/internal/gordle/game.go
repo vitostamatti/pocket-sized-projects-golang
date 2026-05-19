@@ -1,91 +1,77 @@
 package gordle
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 )
 
-var errInvalidWordLength = fmt.Errorf("invalid guess, word doesn't have the same number of characters as the solution")
-
+// Game holds the information we need to get the Feedback of a play.
 type Game struct {
-	reader      *bufio.Reader
-	solution    []rune
-	maxAttempts int
+	solution []rune
 }
 
-func New(corpus []string, cfs ...ConfigFunc) (*Game, error) {
+// New returns a Game variable, which can be used to Play!
+func New(solution string) (*Game, error) {
 	if len(corpus) == 0 {
-		return nil, ErrCorpusIsEmpty
+		return nil, ErrEmptyCorpus
 	}
-	g := &Game{
-		reader:      bufio.NewReader(os.Stdin),
-		solution:    splitToUppercaseCharacters(pickWord(corpus)),
-		maxAttempts: -1,
-	}
-	for _, cf := range cfs {
-		err := cf(g)
-		if err != nil {
-			return nil, fmt.Errorf("unable to apply config func: %w", err)
-		}
-	}
-	return g, nil
+
+	return &Game{
+		solution: splitToUppercaseCharacters(solution),
+	}, nil
 }
 
-func (g *Game) Play() {
-	fmt.Println("Welcome to Gordle!")
+const (
+	// ErrInvalidGuessLength indicates a guess doesn't have the right number of characters.
+	ErrInvalidGuessLength = gameError("invalid guess length")
+)
 
-	for currentAttempt := 1; currentAttempt <= g.maxAttempts; currentAttempt++ {
-		guess := g.ask()
-		fb := computeFeedback(guess, g.solution)
-		fmt.Println(fb.String())
-		if slices.Equal(guess, g.solution) {
-			fmt.Printf("🎉 You won! You found it in %d guess(es)! The word was: %s.\n", currentAttempt, string(g.solution))
-			return
-		}
+// Play runs the game. If the guess is not valid, we return ErrInvalidGuessLength.
+func (g *Game) Play(guess string) (Feedback, error) {
+	err := g.validateGuess(guess)
+	if err != nil {
+		return Feedback{}, fmt.Errorf("this guess is not the correct length: %w", err)
 	}
 
-	fmt.Printf("😔 You've lost! The solution was: %s\n", string(g.solution))
+	// check it
+	characters := splitToUppercaseCharacters(guess)
+	fb := computeFeedback(characters, g.solution)
+	return fb, nil
 }
 
-func (g *Game) ask() []rune {
-	fmt.Printf("Enter  %d-character guess:\n", len(g.solution))
-	for {
-		playerInput, _, err := g.reader.ReadLine()
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Gordle failed to read your guess: %s\n", err.Error())
-			continue
-		}
-		guess := splitToUppercaseCharacters(string(playerInput))
-		err = g.validateGuess(guess)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Your attempt is invalid with Gordle's solution: %s. \n", err.Error())
-		} else {
-			return guess
-		}
-	}
-}
-
-func (g *Game) validateGuess(guess []rune) error {
+// validateGuess ensures the guess is valid enough.
+func (g *Game) validateGuess(guess string) error {
 	if len(guess) != len(g.solution) {
-		return fmt.Errorf("expected %d, got %d, %w", len(g.solution), len(guess), errInvalidWordLength)
+		return fmt.Errorf("you guessed a %d word length, remember the answer is %d word length, %w", len(guess), len(g.solution), ErrInvalidGuessLength)
 	}
+
 	return nil
 }
 
+// ShowAnswer gives up on playing this game. It returns the solution.
+func (g *Game) ShowAnswer() string {
+	return string(g.solution)
+}
+
+// splitToUppercaseCharacters is a naive implementation to turn a string into a list of characters.
 func splitToUppercaseCharacters(input string) []rune {
 	return []rune(strings.ToUpper(input))
 }
 
-// computeFeedback verifies every character in the guess against the solution.
-func computeFeedback(guess, solution []rune) feedback {
-	result := make(feedback, len(guess))
+// computeFeedback verifies every character of the guess against the solution.
+func computeFeedback(guess, solution []rune) Feedback {
+	// initialise holders for marks
+	result := make(Feedback, len(guess))
 	used := make([]bool, len(solution))
+
 	if len(guess) != len(solution) {
-		_, _ = fmt.Fprintf(os.Stderr, "Internal error. Guess and solution have different lengths: %d vs %d\n", len(guess), len(solution))
+		_, _ = fmt.Fprintf(os.Stderr, "guess and solution have different lengths: %d vs %d", len(guess), len(solution))
+		// return a Feedback full of absent characters
+		return result
 	}
+
+	// check for correct letters
 	for posInGuess, character := range guess {
 		if character == solution[posInGuess] {
 			result[posInGuess] = correctPosition
@@ -93,22 +79,28 @@ func computeFeedback(guess, solution []rune) feedback {
 		}
 	}
 
+	// look for letters in the wrong position
 	for posInGuess, character := range guess {
 		if result[posInGuess] != absentCharacter {
+			// The character has already been marked, ignore it.
 			continue
 		}
+
 		for posInSolution, target := range solution {
 			if used[posInSolution] {
+				// The letter of the solution is already assigned to a letter of the guess.
+				// Skip to the next letter of the solution.
 				continue
 			}
 
 			if character == target {
 				result[posInGuess] = wrongPosition
 				used[posInSolution] = true
+				// Skip to the next letter of the guess.
 				break
 			}
 		}
-
 	}
+
 	return result
 }
